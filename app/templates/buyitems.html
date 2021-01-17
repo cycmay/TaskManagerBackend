@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="content container-fluid">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h3 class="page-title">已经购买的项目统计</h3>
+                    <ul class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <a href="{{ url_for('home.index') }}">Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item active">购买统计</li>
+                    </ul>
+                </div>
+                <div class="col-auto text-right float-right ml-auto">
+                    <a href="#" class="btn btn-outline-primary mr-2">
+                        <i class="fas fa-download"></i>
+                        Download
+                    </a>
+                    <a href="{{ url_for('buyitems.add_buyitems') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <!-- /Page Header -->
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="card card-table">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-center mb-0 datatable">
+                                <thead>
+                                <tr>
+                                    <th>名称</th>
+                                    <th>货号</th>
+                                    <th>尺码</th>
+                                    <th>购买平台</th>
+                                    <th>成本</th>
+                                    <th>出售平台</th>
+                                    <th>期望价格</th>
+                                    <th>出售价格</th>
+                                    <th>期望利润</th>
+                                    <th>利润</th>
+                                    <th>期望利润率</th>
+                                    <th>利润率</th>
+                                    <th>购买日期</th>
+                                    <th>出售日期</th>
+                                    <th>状态</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for item in items %}
+                                    <tr class="gradeX">
+                                        <th scope="row">
+                                            <img src="{{ item.imageUrl }}" width='35'><span>{{ item.name }}</span>
+                                        </th>
+                                        <td>{{ item.articleNumber }}</td>
+                                        <td>{{ item.size }}</td>
+                                        <td>{{ item.buyTypeId }}</td>
+                                        <td>{{ item.buyCost }}</td>
+                                        <td>{{ item.soldTypeId }}</td>
+                                        <td>{{ item.soldPriceExpect }}</td>
+                                        <td>{{ item.soldPrice }}</td>
+                                        <td>{{ item.profitExpect }}</td>
+                                        <td>{{ item.profit }}</td>
+                                        <td>{{ item.interestRateExpect*100 }}%</td>
+                                        <td>{{ item.interestRate*100 }}%</td>
+                                        <td>{{ item.buyTime }}</td>
+                                        <td>{{ item.soldTime }}</td>
+                                        <td>{{ item.goodStatus }}</td>
+                                        <td class="text-right">
+                                            <div class="actions">
+                                                <a id="edit_buyitem" onclick="edit_item($(this))" data-id="{{ item.id }}" class="btn btn-sm bg-success-light mr-2">
+                                                    <i class="fas fa-pen"></i>
+                                                </a>
+                                                <a href="#" class="btn btn-sm bg-danger-light">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑项目页面-->
+        <div class="modal fade" id="edit_buyitemModal" tabindex="-1" role="dialog" aria-labelledby="edit_buyitem_ModalLabel">
+            <div class="modal-dialog col-md-6" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title" id="edit_buyitem_ModalLabel">编辑已购项目</h4>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                                aria-hidden="true">×</span></button>
+
+                    </div>
+                    <div class="modal-body">
+                        <form action="#" method="post" name="edit_buyitems">
+                            <div class="form-group col-md-12 ">
+                                <label><span style="color: darkred">(必填)</span>名称</label>
+                                <select class="form-control" id="select_name_add">
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label><span style="color: darkred">(必填)</span>尺码</label>
+                                <select class="form-control" id="select_size_add">
+                                    {% for size in size_list %}
+                                        <option>{{ size }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label><span style="color: darkred">(必填)</span>购买平台</label>
+                                <select class="form-control" id="select_buy_type_add">
+                                    {% for key,name in buy_type.items() %}
+                                        <option value="{{ key }}">{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <span style="color: darkred">(必填)</span>成本</label>
+                                <div>
+                                    <input type="text" class="form-control" id="cost_add">
+                                </div>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <span style="color: darkred">(必填)</span>购买日期</label>
+                                <div>
+                                    <input type="date" class="form-control" id="buy_time_add">
+                                </div>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label>期望出售平台</label>
+                                <select class="form-control" id="select_sold_type_add">
+                                    {% for key,name in sold_type.items() %}
+                                        <option value="{{ key }}">{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <span style="color: darkred">(必填)</span>期望出售价格</label>
+                                <div>
+                                    <input type="text" class="form-control" id="sold_price_expect">
+                                </div>
+                            </div>
+                            <div class="col-12">
+
+                                <button type="submit" class="btn btn-primary btn_add ">
+{#                                    <span class="spinner-border spinner-border-sm mr-2" role="status"></span>#}
+                                    Submit
+                                </button>
+                            </div>
+
+                        </form>
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal"><span
+                                class="glyphicon glyphicon-remove" aria-hidden="true"></span>关闭
+                        </button>
+                        <button type="button" id="btn_submit" class="btn btn-primary" data-dismiss="modal"><span
+                                class="glyphicon glyphicon-floppy-disk" aria-hidden="true"></span>保存
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascript %}
+<script type="text/javascript">
+function edit_item(obj){
+    $("#edit_buyitem_ModalLabel").text("编辑条目");
+    $("#edit_buyitemModal").modal();
+
+    var id = obj.attr("data-id")
+    // 获取已购项目信息
+
+
+
+
+
+}
+</script>
+
+{% endblock %}

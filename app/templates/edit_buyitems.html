@@ -1,0 +1,65 @@
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title">Item Information</h5>
+    </div>
+    <div class="card-body">
+        <form action="#" method="post" name="add_buyitems">
+        {{ buyitemsForm.hidden_tag }}
+            <div class="form-group col-md-12 ">
+                <label><span style="color: darkred">(必填)</span>名称</label>
+                <select class="form-control" id="select_name_add">
+                </select>
+            </div>
+            <div class="form-group col-md-4">
+                <label><span style="color: darkred">(必填)</span>尺码</label>
+                <select class="form-control" id="select_size_add">
+                    {% for size in size_list %}
+                        <option>{{ size }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-4">
+                <label><span style="color: darkred">(必填)</span>购买平台</label>
+                <select class="form-control" id="select_buy_type_add">
+                    {% for key,name in buy_type.items() %}
+                        <option value="{{ key }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-3">
+                <span style="color: darkred">(必填)</span>成本</label>
+                <div>
+                    <input type="text" class="form-control" id="cost_add">
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <span style="color: darkred">(必填)</span>购买日期</label>
+                <div>
+                    <input type="date" class="form-control" id="buy_time_add">
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label>期望出售平台</label>
+                <select class="form-control" id="select_sold_type_add">
+                    {% for key,name in sold_type.items() %}
+                        <option value="{{ key }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-3">
+                <span style="color: darkred">(必填)</span>期望出售价格</label>
+                <div>
+                    <input type="text" class="form-control" id="sold_price_expect">
+                </div>
+            </div>
+            <div class="col-12">
+
+                <button type="submit" class="btn btn-primary btn_add ">
+{#                                    <span class="spinner-border spinner-border-sm mr-2" role="status"></span>#}
+                    Submit
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>

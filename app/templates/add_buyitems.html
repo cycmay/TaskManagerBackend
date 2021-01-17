@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="content container-fluid">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h3 class="page-title">增加已购项目</h3>
+                    <ul class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <a href="{{ url_for('buyitems.buyitems') }}">购买统计</a>
+                        </li>
+                        <li class="breadcrumb-item active">增加条目</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <!-- /Page Header -->
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Item Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="#" method="post" name="add_buyitems">
+                        {{ buyitemsForm.hidden_tag }}
+                            <div class="form-group col-md-12 ">
+                                <label><span style="color: darkred">(必填)</span>名称</label>
+                                <select class="form-control" id="select_name_add">
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label><span style="color: darkred">(必填)</span>尺码</label>
+                                <select class="form-control" id="select_size_add">
+                                    {% for size in size_list %}
+                                        <option>{{ size }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label><span style="color: darkred">(必填)</span>购买平台</label>
+                                <select class="form-control" id="select_buy_type_add">
+                                    {% for key,name in buy_type.items() %}
+                                        <option value="{{ key }}">{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <span style="color: darkred">(必填)</span>成本</label>
+                                <div>
+                                    <input type="text" class="form-control" id="cost_add">
+                                </div>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <span style="color: darkred">(必填)</span>购买日期</label>
+                                <div>
+                                    <input type="date" class="form-control" id="buy_time_add">
+                                </div>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label>期望出售平台</label>
+                                <select class="form-control" id="select_sold_type_add">
+                                    {% for key,name in sold_type.items() %}
+                                        <option value="{{ key }}">{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <span style="color: darkred">(必填)</span>期望出售价格</label>
+                                <div>
+                                    <input type="text" class="form-control" id="sold_price_expect">
+                                </div>
+                            </div>
+                            <div class="col-12">
+
+                                <button type="submit" class="btn btn-primary btn_add ">
+{#                                    <span class="spinner-border spinner-border-sm mr-2" role="status"></span>#}
+                                    Submit
+                                </button>
+                            </div>
+
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+    <!-- select2 -->
+    <script src="{{ url_for('static', filename='assets/js/select2.full.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/select2.min.js') }}"></script>
+    <!-- Custom JS -->
+    {#<script src="{{ url_for('static', filename='js/script.js') }}"></script>#}
+    <!-- toastr  消息提示-->
+    <script src="{{ url_for('static', filename='js/toastr.min.js') }}">
+    <script>
+        function resultFormatResult(state) {
+            var content = state['sellDate'] + ' [' + state['articleNumber'] + '] ' + state['title'];
+            return '<img src=' + state.logoUrl + ' width="50" style="margin-right:5px">' + '<span>' + content + '</span>';
+        }
+
+        function resultFormatSelection(state) {
+            var content = state['sellDate'] + ' [' + state['articleNumber'] + '] ' + state['title'];
+            return '<img src=' + state.logoUrl + ' width="50" style="margin-right:5px">' + '<span>' + content + '</span>';
+        }
+
+        $('#select_name_add').select2({
+            ajax: {
+                url: "{{ url_for('api_v1.api_duproducts') }}",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        // params.term表示输入框中内容，q发生到服务器的参数名
+                        keyword: params.term
+                    }
+                },
+                // 返回数据 可根据template单个option设定样式
+                processResults: function (data) {
+                    var options = []
+                    for (i in data.products) {
+                        // 设定id才能符合select2
+                        var new_option = data.products[i];
+                        new_option["id"] = data.products[i].productId;
+                        new_option["text"] = data.products[i].title;
+                        options.push(new_option);
+                    }
+                    return {
+                        results: options
+                    }
+                },
+                cache: true
+            },
+            templateResult: resultFormatSelection,  // 设定查询样式
+            templateSelection: resultFormatResult,　　　　// 设定查询结果样式
+            escapeMarkup: function (markup) {
+                return markup;
+            },
+            // 最小需要输入多少个字符才进行查询
+            minimumInputLength: 4,
+            // 最大selection限制
+            maximumSelectionLength: 8,
+        });
+
+        // 添加条目
+        $('.btn_add').click(function () {
+            $('.btn_add').attr("disabled", true);
+            var form_data = {
+                'name': $('#select_name_add option:checked').text(),
+                'productId': $('#select_name_add option:checked').val(),
+                'size': $('#select_size_add option:checked').val(),
+                'buyTypeId': $('#select_buy_type_add option:checked').val(),
+                'buyCost': $('#cost_add').val(),
+                'soldTypeId': $('#select_sold_type_add option:checked').val(),
+                'buyTime': $('#buy_time_add').val(),
+                'soldPriceExpect': $('#sold_price_expect').val()
+            };
+            console.log(form_data);
+            $.post("{{ url_for('buyitems.add_buyitems') }}", form_data, function (ret) {
+                if (ret.code == 200) {
+                    $('.btn_add').attr("disabled", false);
+                    toastr.success(form_data.name+ret.message)
+                    console.log(ret);
+                }
+            });
+        });
+    </script>
+{% endblock %}
