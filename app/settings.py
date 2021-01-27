@@ -19,10 +19,20 @@ class BaseConfig:
     # du商品获取分页
     DUPRODUCT_ITEM_PRE_PAGE = 8
 
+    # 默认数据库
     SQLALCHEMY_DATABASE_URI = '{}+{}://{}:{}@{}:{}/{}?charset=utf8'.format(
         DIALECT,DRIVER,USERNAME,PASSWORD,HOST,PORT,DATABASE
     )
+
+    # 绑定多个数据库
+    SQLALCHEMY_BINDS = {
+        'JDTracker': 'mysql+pymysql://root:cyc19971215.@127.0.0.1:3306/JDTracker?charset=utf8',
+    }
+
+    # 查询时显示sql语句
+    SQLALCHEMY_ECHO = True
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
+    # 设置sqlalchemy自动更跟踪数据库
     SQLALCHEMY_TRACK_MODIFICATIONS = True
 
     SQLALCHEMY_POOL_SIZE = 10

@@ -3,6 +3,8 @@ from flask_wtf.csrf import CSRFProtect
 
 from flask_mongoengine import MongoEngine
 
+from flask_pymongo import PyMongo
+
 db = SQLAlchemy()
 csrf = CSRFProtect()
 

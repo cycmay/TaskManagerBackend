@@ -14,7 +14,7 @@ def duProduct_schema(item):
         "logoUrl": item.logoUrl,
         "authPrice": item.authPrice,
         "soldNum": item.soldNum,
-        # priceList : mongodb_du.ListField()
+        "priceList": item.priceList,
         "updateTime": item.updateTime,
     }
 
