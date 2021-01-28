@@ -1,28 +1,35 @@
-import time
-
 from flask import request, jsonify, current_app
 from flask.views import MethodView
+from sqlalchemy.sql import func
 
 from app.apis.v1 import api_v1
-from app.apis.v1.schemas import buyitems_schema, duProducts_schema
+from app.apis.v1.schemas import buyitems_schema, duProducts_schema, buyitemsOverview_schema
 from app.extensions import api_config
-from app.models import Buyitem, du_product
-
 from app.extensions import db
+from app.models import Buyitem, du_product
 
 
 class GetBuyitemsAPI(MethodView):
     """
     获取已购项目信息
     """
+
     def get(self):
         currentPage = int(request.args.get('currentPage'))
         showCount = int(request.args.get("showCount"))
 
-        buyitems = Buyitem.query.offset((currentPage-1)*showCount).limit(showCount)
-        totalCount = Buyitem.query.count()
+        goodStatus = request.args.get("goodStatus", None)
+        if goodStatus:
+            buyitems = Buyitem.query.filter(Buyitem.goodStatus == goodStatus).offset(
+                (currentPage - 1) * showCount).limit(showCount)
+            totalCount = Buyitem.query.filter(Buyitem.goodStatus == goodStatus).count()
+        else:
+            buyitems = Buyitem.query.offset(
+                (currentPage - 1) * showCount).limit(showCount)
+            totalCount = Buyitem.query.count()
 
         return jsonify(buyitems_schema(totalCount, buyitems))
+
 
 class DuProductsAPI(MethodView):
     """
@@ -32,13 +39,63 @@ class DuProductsAPI(MethodView):
     def get(self):
         keyword = request.args.get('keyword', '666', type=str)
         products = du_product.objects(articleNumber__contains=keyword)[:
-                                                                      current_app.config["DUPRODUCT_ITEM_PRE_PAGE"]]
+                                                                       current_app.config["DUPRODUCT_ITEM_PRE_PAGE"]]
         return jsonify(duProducts_schema(products))
+
+
+class GetBuyitemsOverview(MethodView):
+    """
+    获取已购买商品的总览信息
+    """
+
+    def get(self):
+        data = {}
+        # 待收货
+        data["to_be_received"] = Buyitem.query.filter(Buyitem.goodStatus == 1).count()
+        # 待出售
+        data["to_be_sold"] = Buyitem.query.filter(Buyitem.goodStatus == 2).count()
+        # 正在出售
+        data["on_sale"] = Buyitem.query.filter(Buyitem.goodStatus == 3).count()
+        # 已出售
+        data["has_been_sold"] = Buyitem.query.filter(Buyitem.goodStatus == 4).count()
+
+        # 实际盈利 选取已经售出的商品
+        data["profit"] = round(
+            float(Buyitem.query.with_entities(func.sum(Buyitem.profit)).filter(Buyitem.goodStatus == 4).scalar()), 2)
+
+        # 实际成本 选取已经售出的商品
+        data["total_buy_cost"] = round(
+            float(Buyitem.query.with_entities(func.sum(Buyitem.buyCost)).filter(Buyitem.goodStatus == 4).scalar()), 2)
+
+        data["total_cost"] = round(
+            float(Buyitem.query.with_entities(func.sum(Buyitem.buyCost)).filter(Buyitem.goodStatus == 4).scalar()), 2)
+        # 总销售额 统计所有已经出售的商品
+        data["sold_total"] = round(
+            float(Buyitem.query.with_entities(func.sum(Buyitem.soldPrice)).filter(Buyitem.goodStatus == 4).scalar()), 2)
+
+        # 利率比
+        if (data['profit'] and data['total_cost']):
+            data['ceil'] = round(data['profit'] / data['total_cost'], 4) * 100
+        else:
+            data['ceil'] = 0
+
+        # 预计盈利
+        data["profit_expect"] = round(float(Buyitem.query.with_entities(func.sum(Buyitem.profitExpect)).scalar()), 2)
+        # 预计成本
+        data['cost_future'] = round(float(Buyitem.query.with_entities(func.sum(Buyitem.buyCost)).scalar()), 2)
+        # 预计利率比
+        data['ceil_future'] = 0
+        if (data['cost_future']):
+            data['ceil_future'] = round(data['profit_expect'] / data['cost_future'], 4) * 100
+
+        return jsonify(buyitemsOverview_schema(data))
+
 
 class AlterBuyitemAPI(MethodView):
     """
     修改或增加buyitem值
     """
+
     def post(self):
         buyitem = request.get_json().get("buyitem")
         if buyitem.get("submitState") == "Add":
@@ -88,7 +145,7 @@ class AlterBuyitemAPI(MethodView):
             if not buyitem.get("soldPrice"):
                 buyitem["soldPrice"] = float(buyitem.get("soldPriceExpect"))
                 # 计算预计利润
-                buyitem["profitExpect"] = round(profit_expect(buyitem),2)
+                buyitem["profitExpect"] = round(profit_expect(buyitem), 2)
                 # 计算预计利润率
                 buyitem["interestRateExpect"] = round(buyitem.get("profitExpect") / buyitem.get("buyCost"), 4)
                 buyitem["interestRate"] = buyitem["interestRateExpect"]
@@ -136,9 +193,12 @@ class AlterBuyitemAPI(MethodView):
                 "message": f"删除{buyitem.get('title')}成功！"
             }
 
+
 api_v1.add_url_rule('/getBuyitems', view_func=GetBuyitemsAPI.as_view('api_getbuyitems'), methods=["GET", "POST"])
 api_v1.add_url_rule('/duproducts', view_func=DuProductsAPI.as_view('api_duproducts'), methods=["GET"])
 api_v1.add_url_rule('/alterBuyitem', view_func=AlterBuyitemAPI.as_view('api_alterbuyitem'), methods=["POST"])
+api_v1.add_url_rule('/getBuyitemsOverview', view_func=GetBuyitemsOverview.as_view('api_getbuyitemoverview'),
+                    methods=["GET", "POST"])
 
 
 # 计算预计利润
@@ -184,4 +244,3 @@ def profit_expect(data: dict):
         data["profit"] -= data.get("soldCharge")
 
     return data.get("profit")
-

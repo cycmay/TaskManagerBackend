@@ -53,6 +53,25 @@ def buyitem_schema(item):
         "soldTime": item.soldTime,
     }
 
+def buyitemsOverview_schema(item):
+    return {
+        "code": 200,
+        "data": {
+            "to_be_received": item.get("to_be_received"),
+            "to_be_sold": item.get("to_be_sold"),
+            "on_sale": item.get("on_sale"),
+            "has_been_sold": item.get("has_been_sold"),
+            "profit": item.get("profit"),
+            "total_buy_cost": item.get("total_buy_cost"),
+            "total_cost": item.get("total_cost"),
+            "sold_total": item.get("sold_total"),
+            "ceil": item.get("ceil"),
+            "profit_expect": item.get("profit_expect"),
+            "cost_future": item.get("cost_future"),
+            "ceil_future": item.get("ceil_future")
+        }
+    }
+
 def buyitems_schema(totalCount, items):
     return {
         "code": 200,
