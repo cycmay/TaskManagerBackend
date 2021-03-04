@@ -6,6 +6,8 @@ from app.extensions import api_config
 
 
 def duProduct_schema(item):
+    if not item:
+        return {}
     return {
         "productId": item.productId,
         "articleNumber": item.articleNumber,
@@ -28,9 +30,6 @@ def duProducts_schema(items):
     }
 
 def buyitem_schema(item):
-    buy_type = api_config.get("buy_type")
-    sold_type = api_config.get("sold_type")
-    good_status = api_config.get("good_status")
     return {
         "id": item.id,
         "name": item.name,

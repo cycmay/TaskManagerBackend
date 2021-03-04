@@ -14,6 +14,8 @@ from app.apis.v1 import api_v1
 from app.apis.v1.schemas import buyitems_schema, duProducts_schema
 from app.domain.MongoSession import MongoSession
 from app.domain.RedisSession import RedisSession
+from app.utils.ProxiesServer import ProxiesServer
+from app.utils.functools import get_random_useragent
 from app.extensions import api_config
 from app.models import Buyitem, du_product
 
@@ -171,6 +173,7 @@ class GetParsePromoteUrlAPI(MethodView):
     """
     通过解析推广的URL得到目标产品的所有pid-tip map
     """
+    proxiesServer = ProxiesServer()
     def post(self):
         targetUrl = request.get_json().get("targetUrl")
         ret = {
@@ -188,16 +191,16 @@ class GetParsePromoteUrlAPI(MethodView):
         """
 
         headers = {
-            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.20 Safari/537.36",
-            "referer": "https://u.jd.com/",
-            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-            "sec-fetch-dest": "document",
-            "sec-fetch-mode": "navigate",
-            "sec-fetch-site": "same-site",
-            "sec-fetch-user": "?1",
-            "upgrade-insecure-requests": "1"
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2",
+            "Connection": "keep-alive",
+            "User-agent": get_random_useragent(),
+            "Host": "item.jd.com",
+            "Upgrade-Insecure-Requests": "1"
         }
-        resp = requests.get(url=url, headers=headers)
+        proxies = self.proxiesServer.get_proxies_from_api2()
+        resp = requests.get(url=url, headers=headers, proxies=proxies)
         soup = BeautifulSoup(resp.text, "html.parser")
         pattern = re.compile(r"var pageConfig = {(.*?)};$", re.MULTILINE | re.DOTALL)
         script = soup.find("script", text=pattern)

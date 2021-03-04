@@ -25,6 +25,7 @@ class GetForecastProductsAPI(MethodView):
     """
     获取预测产品数据
     """
+    exists = 1
 
     def get(self):
         currentPage = int(request.args.get('currentPage'))
@@ -41,12 +42,15 @@ class GetForecastProductsAPI(MethodView):
         products = Forecast.query.filter(Forecast.vendorId == vendorId,
                                          Forecast.interestRate > minInterestRate,
                                          Forecast.duSoldNum > minDuSoldNum,
+                                         Forecast.stock == self.exists, # 有货
                                          ). \
-            order_by(Forecast.interestRate.desc()).offset((currentPage - 1) * showCount). \
+            order_by(Forecast.stock.desc(), Forecast.interestRate.desc()).offset((currentPage - 1) * showCount). \
             limit(showCount)
         totalCount = Forecast.query.filter(Forecast.vendorId == vendorId,
                                            Forecast.interestRate > minInterestRate,
-                                           Forecast.duSoldNum > minDuSoldNum, ).count()
+                                           Forecast.duSoldNum > minDuSoldNum,
+                                           Forecast.stock == self.exists, # 有货
+                                        ).count()
 
         return jsonify(products_schema(totalCount, products))
 
@@ -113,6 +117,7 @@ def product_schema(item):
         "gap": round(float(item.gap if item.gap else 0.0), 2),
         "interest": round(float(item.interest if item.interest else 0.0), 2),
         "interestRate": round(float(item.interestRate if item.interestRate else 0.0), 4),
+        "stock": int(item.stock) if item.stock else 0,
         "imageUrl": item.imageUrl,
         "itemUrl": item.itemUrl
     }
