@@ -20,7 +20,11 @@ class MongoSession(object):
         self.col = self.db[col]
 
     def create(self, item: dict):
-        return self.col.insert_one(item)
+        """
+        return: inserted_id
+        """
+        result = self.col.insert_one(item)
+        return result.inserted_id
 
     def read(self):
         """
@@ -29,11 +33,16 @@ class MongoSession(object):
         """
         return self.col.find()
 
+    def read_one(self, where:dict):
+        ret = self.col.find_one(where)
+        if not ret:
+            return False
+        return ret
+
     def update(self, where:dict, item:dict):
         ret = self.col.find_one(where)
         if not ret:
             return False
-        print(item)
         return self.col.update_one(where, item)
 
     def delete(self, where:dict):

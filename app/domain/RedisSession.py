@@ -27,3 +27,6 @@ class RedisSession(object):
 
     def hGet(self, hash_key, key):
         return self.r.hget(hash_key, key)
+
+    def hRemove(self, hash_key, key):
+        return self.r.hdel(hash_key, key)

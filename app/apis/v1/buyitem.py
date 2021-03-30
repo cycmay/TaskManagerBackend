@@ -22,14 +22,17 @@ class GetBuyitemsAPI(MethodView):
         showCount = int(request.args.get("showCount"))
 
         goodStatus = request.args.get("goodStatus", None)
+        # 通过关键字查询
+        keywords = request.args.get("keywords", None)
+
+        buyitems = Buyitem.query
         if goodStatus:
-            buyitems = Buyitem.query.filter(Buyitem.goodStatus == goodStatus).order_by(Buyitem.buyTime.desc(), Buyitem.articleNumber).offset(
+            buyitems = buyitems.filter(Buyitem.goodStatus == goodStatus)
+        if keywords:
+            buyitems = buyitems.filter(Buyitem.articleNumber.like(f"%{keywords}%"))
+        buyitems_data = buyitems.order_by(Buyitem.buyTime.desc(), Buyitem.articleNumber).offset(
                 (currentPage - 1) * showCount).limit(showCount)
-            totalCount = Buyitem.query.filter(Buyitem.goodStatus == goodStatus).count()
-        else:
-            buyitems = Buyitem.query.order_by(Buyitem.buyTime.desc(), Buyitem.articleNumber).offset(
-                (currentPage - 1) * showCount).limit(showCount)
-            totalCount = Buyitem.query.count()
+        totalCount = buyitems.count()
         size_type = api_config.get("size")
 
         result = {
@@ -40,7 +43,7 @@ class GetBuyitemsAPI(MethodView):
             }
         }
         # 计算价格浮动
-        for buyitem in buyitems:
+        for buyitem in buyitems_data:
             buyitem_dict = buyitem_schema(buyitem)
             # 获取得物的产品信息
             product = du_product.objects(articleNumber=buyitem.articleNumber).first()
