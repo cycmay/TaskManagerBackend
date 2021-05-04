@@ -67,6 +67,8 @@ class ManageSolutionsAPI(MethodView):
     _redis = RedisSession()
     _redis_skuIds_key = "JDSkuIds:"
     _redis_Solutions_set_key = "JDSolutionsSet:"
+    # 保存solution的metadata
+    _redis_Solutions_metadata_key = "JDSolutionsMetadata:"
     _redis_Solutions_hash_key = "JDSolutionsHash:"
 
     def __init__(self):
@@ -79,6 +81,8 @@ class ManageSolutionsAPI(MethodView):
             "updateSolution": self.updateSolution,
             "listSolutions": self.listSolutions,
             "removeSolution": self.removeSolution,
+            "pauseSolution": self.pauseSolution,
+            "recoverSolution": self.recoverSolution
         }
 
     def addSolution(self):
@@ -92,12 +96,14 @@ class ManageSolutionsAPI(MethodView):
         # redis中集合Solution: 加入该id
         self._redis.sAdd(set_key=self._redis_Solutions_set_key, item=insertedId)
         # redis中加入solution:[id]的配置
-        self._redis.hSet(hash_key=self._redis_Solutions_hash_key + insertedId, key="name",
+        self._redis.hSet(hash_key=self._redis_Solutions_metadata_key + insertedId, key="name",
                          value=str(params.get("name")))
-        self._redis.hSet(hash_key=self._redis_Solutions_hash_key + insertedId, key="target",
+        self._redis.hSet(hash_key=self._redis_Solutions_metadata_key + insertedId, key="target",
                          value=float(params.get("target")))
-        self._redis.hSet(hash_key=self._redis_Solutions_hash_key + insertedId, key="deviation",
+        self._redis.hSet(hash_key=self._redis_Solutions_metadata_key + insertedId, key="deviation",
                          value=float(params.get("deviation")))
+        self._redis.hSet(hash_key=self._redis_Solutions_metadata_key + insertedId, key="id",
+                         value=str(insertedId))
         return ret
 
     def updateSolution(self):
@@ -114,6 +120,14 @@ class ManageSolutionsAPI(MethodView):
             "target": params.get("target"),
             "deviation": params.get("deviation")
         }
+        # redis中修改solution:[id]的配置
+        self._redis.hSet(hash_key=self._redis_Solutions_metadata_key + _id, key="name",
+                         value=str(params.get("name")))
+        self._redis.hSet(hash_key=self._redis_Solutions_metadata_key + _id, key="target",
+                         value=float(params.get("target")))
+        self._redis.hSet(hash_key=self._redis_Solutions_metadata_key + _id, key="deviation",
+                         value=float(params.get("deviation")))
+
         self._mongo_solutions.update(where, {'$set': item})
         ret["message"] = f"修改Solution {_id} 成功！"
         return ret
@@ -139,12 +153,59 @@ class ManageSolutionsAPI(MethodView):
             for pid in pids:
                 self._redis.sRemove(self._redis_skuIds_key, str(pid))
             self._mongo_entry.delete({"_id": ObjectId(entry_id)})
-        # 删除solutions表中关于id的
+        # 删除solutions set表中关于id的
         self._redis.sRemove(self._redis_Solutions_set_key, str(_id))
         # 删除solution
         self._mongo_solutions.delete({"_id": ObjectId(_id)})
         ret["message"] = f"删除Solution {_id} 成功！"
         return ret
+
+    def pauseSolution(self):
+        """
+        暂停方案，redis_set内删除id，redis_set内删除skuids, 并标记已经暂停
+        """
+        ret = {"code": 200}
+        params = self._request_json.get("params")
+        _id = params.get("_id")
+        solution = self._mongo_solutions.read_one({"_id": ObjectId(_id)})
+        # 删除子任务中所有skuid
+        for entry_id in solution.get("entryIdList"):
+            entry = self._mongo_entry.read_one({"_id": ObjectId(entry_id)})
+            # redis中stocks删除相关id
+            pids = list(entry.get("pid"))
+            for pid in pids:
+                self._redis.sRemove(self._redis_skuIds_key, str(pid))
+        # 删除solutions set表中关于id的
+        self._redis.sRemove(self._redis_Solutions_set_key, str(_id))
+        # 标记solution为暂停状态 1—>2
+        solution["status"] = 2
+        self._mongo_solutions.update({"_id":ObjectId(_id)}, {"$set": solution})
+        ret["message"] = f"暂停Solution {_id} 成功！"
+        return ret
+
+    def recoverSolution(self):
+        """
+        重新恢复方案， redis_set中增加id，redis_set中重新加入skuids, 并标记已经
+        """
+        ret = {"code": 200}
+        params = self._request_json.get("params")
+        _id = params.get("_id")
+        solution = self._mongo_solutions.read_one({"_id": ObjectId(_id)})
+        # 删除子任务中所有skuid
+        for entry_id in solution.get("entryIdList"):
+            entry = self._mongo_entry.read_one({"_id": ObjectId(entry_id)})
+            # redis中stocks增加相关id
+            pids = list(entry.get("pid"))
+            for pid in pids:
+                self._redis.sAdd(self._redis_skuIds_key, str(pid))
+        # 增加solutions set表中关于id的
+        self._redis.sAdd(self._redis_Solutions_set_key, str(_id))
+        # 标记solution为暂停状态 2—>1
+        solution["status"] = 1
+        self._mongo_solutions.update({"_id": ObjectId(_id)}, {"$set": solution})
+        ret["message"] = f"启动Solution {_id} 成功！"
+        return ret
+
 
     def post(self):
         method = request.get_json().get("method")
@@ -169,11 +230,14 @@ class ManageEntriesAPI(MethodView):
     _redis = RedisSession()
     _redis_skuIds_key = "JDSkuIds:"
     _redis_Solutions_set_key = "JDSolutionsSet:"
+    # 保存solution的metadata
+    _redis_Solutions_metadata_key = "JDSolutionsMetadata:"
     _redis_Solutions_hash_key = "JDSolutionsHash:"
 
     def __init__(self):
         self.optional = dict()
         self.init_optional()
+        self._request_json = None
 
     def init_optional(self):
         self.optional = {
@@ -183,11 +247,13 @@ class ManageEntriesAPI(MethodView):
             "removeTasksAll": self.removeTasksAll,
             "listEntries": self.listEntries,
             "listEntriesByIdList": self.listEntriesByIdList,
+            "activateEntry": self.activateEntry,
+            "deactivateEntry": self.deactivateEntry
         }
 
-    def addEntry(self, _request_json):
+    def addEntry(self):
         ret = {"code": 200}
-        params = _request_json.get("params")
+        params = self._request_json.get("params")
         # 加入任务列表
         params.pop("_id")
         insertedId = str(self._mongo_entry.create(params))
@@ -210,28 +276,75 @@ class ManageEntriesAPI(MethodView):
         ret["entryId"] = insertedId
         return ret
 
-    def updateEntry(self, _request_json):
+    def updateEntry(self):
         ret = {"code": 200}
-        params = _request_json.get("params")
+        params = self._request_json.get("params")
         _id = params.get("_id")
         where = {}
         params.pop("_id")
         where["_id"] = ObjectId(_id)
         # 将原来的entry内skuid删除掉 在solution中
-        skuIds = self._mongo_entry.read_one({"_id": _id}).get("pid")
+        # redis stock中删除并重新插入
+        skuIds = self._mongo_entry.read_one({"_id": ObjectId(_id)}).get("pid")
         for skuId in skuIds:
             self._redis.hRemove(hash_key=self._redis_Solutions_hash_key + params.get("father"), key=str(skuId))
+            self._redis.sRemove(self._redis_skuIds_key, str(skuId))
         # 重新插入skuids 到hash表
         for skuId in params.get("pid"):
             self._redis.hSet(hash_key=self._redis_Solutions_hash_key + params.get("father"), key=str(skuId),
                              value=float(params.get("price")))
+            self._redis.sAdd(self._redis_skuIds_key, str(skuId))
         self._mongo_entry.update(where, {'$set': params})
+
         ret["message"] = f"修改Entry {_id} 成功！"
         return ret
 
-    def removeEntry(self, _request_json):
+    # 激活entry
+    def activateEntry(self):
         ret = {"code": 200}
-        params = _request_json.get("params")
+        entry = self._request_json.get("params")
+        _id = entry.get("_id")
+        entry = self._mongo_entry.read_one({"_id": ObjectId(_id)})
+        # 将原来的entry内skuid增加到 solution中
+        for skuId in entry.get("pid"):
+            self._redis.hSet(hash_key=self._redis_Solutions_hash_key + entry.get("father"), key=str(skuId),
+                             value=float(self._mongo_entry.read_one({"_id": ObjectId(_id)}).get("price")))
+            self._redis.sAdd(self._redis_skuIds_key, str(skuId))
+
+        # 将mongo中entry状态设置为1
+        entry["activate"] = 1
+        self._mongo_entry.update({"_id": ObjectId(_id)}, {'$set': entry})
+        ret["message"] = f"激活Entry {_id} 成功！"
+        return ret
+
+    # 暂停entry
+    def deactivateEntry(self):
+        ret = {"code": 200}
+        entry = self._request_json.get("params")
+        _id = entry.get("_id")
+        entry = self._mongo_entry.read_one({"_id": ObjectId(_id)})
+        # 将原来的entry内skuid删除 solution中
+        for skuId in entry.get("pid"):
+            self._redis.hRemove(hash_key=self._redis_Solutions_hash_key + entry.get("father"), key=str(skuId))
+            self._redis.sRemove(self._redis_skuIds_key, str(skuId))
+
+        # 将mongo中entry状态设置为1
+        entry["activate"] = 2
+        self._mongo_entry.update({"_id": ObjectId(_id)}, {'$set': entry})
+        ret["message"] = f"暂停Entry {_id} 成功！"
+        return ret
+
+    # 激活全部entry
+    def activateAllEntry(self):
+        ret = {"code": 200}
+
+
+        ret["message"] = f"激活全部Entry成功！"
+        return ret
+
+    def removeEntry(self):
+        ret = {"code": 200}
+        params = self._request_json.get("params")
         _id = params.get("_id")
         where = {}
         where["_id"] = ObjectId(_id)
@@ -257,7 +370,7 @@ class ManageEntriesAPI(MethodView):
         ret["message"] = f"删除Entry {_id} 成功！"
         return ret
 
-    def removeTasksAll(self, _request_json):
+    def removeTasksAll(self):
         ret = {"code": 200}
 
         # 执行一次事务
@@ -271,7 +384,7 @@ class ManageEntriesAPI(MethodView):
         ret["message"] = f"删除所有Entry成功！"
         return ret
 
-    def listEntries(self, _request_json):
+    def listEntries(self):
         ret = {"code": 200}
         Entries = []
         for item in self._mongo_entry.read():
@@ -280,9 +393,9 @@ class ManageEntriesAPI(MethodView):
         ret["entries"] = Entries
         return ret
 
-    def listEntriesByIdList(self, _request_json):
+    def listEntriesByIdList(self):
         ret = {"code": 200}
-        params = _request_json.get("params")
+        params = self._request_json.get("params")
         Entries = []
         if len(params) == 0:
             return ret
@@ -295,11 +408,12 @@ class ManageEntriesAPI(MethodView):
 
     def post(self):
         method = request.get_json().get("method")
-        _request_json = request.get_json()
         if not method:
             abort(400)
+        else:
+            self._request_json = request.get_json()
         try:
-            return self.optional[method](_request_json)
+            return self.optional[method]()
         except Exception as e:
             print(traceback.format_exc())
             return {"code": 500, "error": str(e)}
