@@ -220,6 +220,86 @@ class ManageSolutionsAPI(MethodView):
             return {"code": 500, "error": str(e)}
 
 
+class ManagePresaleSolutionsAPI(ManageSolutionsAPI):
+    """
+    管理预售解决方案
+    """
+    _mongo_entry = MongoSession(db="Gaze", col="JDPresaleEntries")
+    _mongo_solutions = MongoSession(db="Gaze", col="JDPresaleSolutions")
+    _request_json = None
+
+    _redis = RedisSession()
+    _redis_skuIds_key = "JDSkuIds:"
+    _redis_Solutions_set_key = "JDPresaleSolutionsSet:"
+    # 保存solution的metadata
+    _redis_Solutions_metadata_key = "JDPresaleSolutionsMetadata:"
+    _redis_Solutions_hash_key = "JDPresaleSolutionsHash:"
+
+    def __init__(self):
+        ManageSolutionsAPI.__init__(self)
+        self.optional = dict()
+        self.init_optional()
+
+    def pauseSolution(self):
+        """
+        暂停方案，redis_set内删除id，redis_set内删除skuids, 并标记已经暂停
+        """
+        ret = {"code": 200}
+        params = self._request_json.get("params")
+        _id = params.get("_id")
+        solution = self._mongo_solutions.read_one({"_id": ObjectId(_id)})
+        # 删除子任务中所有skuid
+        for entry_id in solution.get("entryIdList"):
+            entry = self._mongo_entry.read_one({"_id": ObjectId(entry_id)})
+            # redis中stocks删除相关id
+            pids = list(entry.get("pid"))
+            for pid in pids:
+                self._redis.sRemove(self._redis_skuIds_key, str(pid))
+        # 删除solutions set表中关于id的
+        self._redis.sRemove(self._redis_Solutions_set_key, str(_id))
+        # 标记solution为暂停状态 1—>2
+        solution["status"] = 2
+        self._mongo_solutions.update({"_id":ObjectId(_id)}, {"$set": solution})
+        ret["message"] = f"暂停Solution {_id} 成功！"
+        return ret
+
+    def recoverSolution(self):
+        """
+        重新恢复方案， redis_set中增加id，redis_set中重新加入skuids, 并标记已经
+        """
+        ret = {"code": 200}
+        params = self._request_json.get("params")
+        _id = params.get("_id")
+        solution = self._mongo_solutions.read_one({"_id": ObjectId(_id)})
+        # 删除子任务中所有skuid
+        for entry_id in solution.get("entryIdList"):
+            entry = self._mongo_entry.read_one({"_id": ObjectId(entry_id)})
+            # redis中stocks增加相关id
+            pids = list(entry.get("pid"))
+            for pid in pids:
+                self._redis.sAdd(self._redis_skuIds_key, str(pid))
+        # 增加solutions set表中关于id的
+        self._redis.sAdd(self._redis_Solutions_set_key, str(_id))
+        # 标记solution为暂停状态 2—>1
+        solution["status"] = 1
+        self._mongo_solutions.update({"_id": ObjectId(_id)}, {"$set": solution})
+        ret["message"] = f"启动Solution {_id} 成功！"
+        return ret
+
+
+    def post(self):
+        method = request.get_json().get("method")
+        if not method:
+            abort(400)
+        else:
+            self._request_json = request.get_json()
+        try:
+            return self.optional[method]()
+        except Exception as e:
+            print(traceback.format_exc())
+            return {"code": 500, "error": str(e)}
+
+
 class ManageEntriesAPI(MethodView):
     """
     管理监控的任务列表
@@ -419,6 +499,27 @@ class ManageEntriesAPI(MethodView):
             return {"code": 500, "error": str(e)}
 
 
+class ManagePresaleEntriesAPI(ManageEntriesAPI):
+    """
+    管理预售监控的任务列表
+    """
+    _mongo_entry = MongoSession(db="Gaze", col="JDPresaleEntries")
+    _mongo_solutions = MongoSession(db="Gaze", col="JDPresaleSolutions")
+
+    _redis = RedisSession()
+    _redis_skuIds_key = "JDSkuIds:"
+    _redis_Solutions_set_key = "JDPresaleSolutionsSet:"
+    # 保存solution的metadata
+    _redis_Solutions_metadata_key = "JDPresaleSolutionsMetadata:"
+    _redis_Solutions_hash_key = "JDPresaleSolutionsHash:"
+
+
+    def __init__(self):
+        ManageEntriesAPI.__init__(self)
+        self.optional = dict()
+        self.init_optional()
+        self._request_json = None
+
 class ManageHistroyTasksAPI(MethodView):
     """
     管理监控的历史任务列表
@@ -586,6 +687,12 @@ api_v1.add_url_rule('/JDtask/manageStocks', view_func=ManageStocksAPI.as_view('a
 api_v1.add_url_rule('/JDtask/manageEntries', view_func=ManageEntriesAPI.as_view('api_JDtaskManageEntries'),
                     methods=["POST"])
 api_v1.add_url_rule('/JDtask/manageSolutions', view_func=ManageSolutionsAPI.as_view('api_JDtaskManageSolutions'),
+                    methods=["POST"])
+api_v1.add_url_rule('/JDtask/managePresaleSolutions',
+                    view_func=ManagePresaleSolutionsAPI.as_view('api_JDtaskManagePresaleSolutions'),
+                    methods=["POST"]
+                    )
+api_v1.add_url_rule('/JDtask/managePresaleEntries', view_func=ManagePresaleEntriesAPI.as_view('api_JDtaskManagePresaleEntries'),
                     methods=["POST"])
 api_v1.add_url_rule('/JDtask/manageHistoryTasks',
                     view_func=ManageHistroyTasksAPI.as_view('api_JDtaskManageHistoryTasks'), methods=["POST"])

@@ -74,6 +74,44 @@ class Forecast(db.Model):
 
     create_at = db.Column(db.DateTime, default=datetime.datetime.now)
 
+# 活动商品进行计算得出利润排序
+class ActivityForecast(db.Model):
+    # 绑定的查询数据库
+    __tablename__ = 'forecast_activity'
+    __table_args__ = {'schema': 'JDTracker'}
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    # 活动id
+    activityId = db.Column(db.String(32))
+    # jd的商品id
+    productId = db.Column(db.String(32))
+    vendorId = db.Column(db.String(32))
+    articleNumber = db.Column(db.String(32))
+    title = db.Column(db.String(255))
+    # jd的商品标价
+    price = db.Column(db.DECIMAL(10, 2))
+    # 打完折的价格
+    finalPrice = db.Column(db.DECIMAL(10, 2))
+    # 尺码
+    size = db.Column(db.String(32))
+    # 得物现货价格
+    duPrice = db.Column(db.DECIMAL(10, 2))
+    # 得物销量
+    duSoldNum = db.Column(db.Integer)
+    # 价差
+    gap = db.Column(db.DECIMAL(10, 2))
+    # 到手利润
+    interest = db.Column(db.DECIMAL(10, 2))
+    # 到手利润率
+    interestRate = db.Column(db.DECIMAL(10, 4))
+    # 商品图片
+    imageUrl = db.Column(db.String(255))
+    # 商品地址
+    itemUrl = db.Column(db.String(255))
+
+    # 状态 0 有货 1 无货
+    stock = db.Column(db.Integer)
+
+    create_at = db.Column(db.DateTime, default=datetime.datetime.now)
 
 # 唯品会商品
 class VIPForecast(db.Model):
@@ -122,6 +160,15 @@ class Shops(db.Model):
     shopname = db.Column(db.String(32))
     shopdiscount = db.Column(db.DECIMAL(10,4))
 
+class Activities(db.Model):
+    # 绑定的查询数据库
+    __bind_key__ = 'JDTracker'
+    __tablename__ = 'activities'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    activityId = db.Column(db.String(32))
+    vendorId = db.Column(db.String(32))
+    activityname = db.Column(db.String(32))
+    activitydiscount = db.Column(db.DECIMAL(10,4))
 
 
 
