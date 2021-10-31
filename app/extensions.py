@@ -95,7 +95,7 @@ api_config = {
             # 转账服务费
             'transfer_service_fee': 0.01,
         }
-    }
-
+    },
+    "after_sale_service": 0.015
 
 }

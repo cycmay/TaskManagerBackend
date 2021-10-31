@@ -120,6 +120,7 @@ def profit_expect(data: dict):
         data["soldCharge"] += api_config.get("sold_rate").get(data.get("soldTypeId")).get("inspection_fee")
         data["soldCharge"] += api_config.get("sold_rate").get(data.get("soldTypeId")).get("identification_fee")
         data["soldCharge"] += api_config.get("sold_rate").get(data.get("soldTypeId")).get("packing_service_fee")
+        data["soldCharge"] += round(data.get("soldPrice")*api_config.get("after_sale_service"), 2)
 
     if data.get("buyCost") and data.get("soldPrice"):
         data["profit"] = data.get("soldPrice") - data.get("buyCost")
